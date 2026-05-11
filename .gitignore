@@ -1,0 +1,53 @@
+# Secrets
+.env
+.env.local
+schwab_token.json
+.streamlit/secrets.toml
+
+# Data (no pushear datasets historicos pesados ni outputs de research)
+data/raw/
+data/clean/
+data/external/
+data/scanner_signals/*.sqlite
+data/scanner_signals/*.sqlite-*
+
+# Reports (intermediate; los .docx finales tampoco van al repo)
+reports/_phase*_results/
+reports/_phase*_charts/
+reports/*.docx
+
+# Research data referenced via absolute paths (estaban fuera del repo)
+Master_Historico_Completo_*.csv
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Virtualenvs
+venv/
+.venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.spyder-py3/
+.ipython/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Streamlit cache
+.streamlit/cache/

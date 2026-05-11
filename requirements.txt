@@ -1,0 +1,15 @@
+# Streamlit + viz
+streamlit>=1.50,<2.0
+plotly>=5.22,<7.0
+
+# Data + numerics
+pandas>=2.2,<3.0
+numpy>=1.26,<3.0
+scipy>=1.13,<2.0
+
+# Live data feeds
+yfinance>=0.2.40
+schwab-py>=1.5
+
+# Config
+python-dotenv>=1.0
