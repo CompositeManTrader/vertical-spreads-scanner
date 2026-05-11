@@ -75,14 +75,17 @@ print()
 print("-" * 70)
 
 token_json = TOKEN_PATH.read_text().strip()
-# Compactar a una sola linea para TOML triple-quoted
+# Re-serializar compacto y validado
+parsed = json.loads(token_json)
+token_compact = json.dumps(parsed, separators=(",", ":"))
+
+# Usar TOML LITERAL string ''' (single quotes triple) para evitar que TOML
+# procese secuencias de escape como \n, \t, \uXXXX dentro del JSON.
 print(f'SCHWAB_APP_KEY = "{APP_KEY}"')
 print(f'SCHWAB_APP_SECRET = "{APP_SECRET}"')
 print('SCHWAB_CALLBACK_URL = "https://127.0.0.1:8182"')
 print('SCHWAB_TOKEN_PATH = "/tmp/schwab_token.json"')
-print('SCHWAB_TOKEN_JSON = """')
-print(token_json)
-print('"""')
+print(f"SCHWAB_TOKEN_JSON = '{token_compact}'")
 print("-" * 70)
 print()
 print("CAVEATS:")

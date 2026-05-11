@@ -183,10 +183,9 @@ class SchwabFeed(DataFeed):
 
     def _maybe_write_token_from_secret(self) -> bool:
         """
-        Si SCHWAB_TOKEN_JSON esta en secrets/env, escribirlo a token_path.
-        Esto permite usar Schwab en Streamlit Cloud sin necesidad de hacer
-        OAuth flow desde el server (que no funciona porque el callback
-        127.0.0.1 es localhost del server, no del usuario).
+        Si SCHWAB_TOKEN_JSON esta en secrets/env, parsearlo, validarlo y
+        escribirlo limpio a token_path. Permite usar Schwab en Streamlit
+        Cloud sin OAuth flow (que no funciona desde el server).
         """
         import json
         token_json = None
@@ -207,12 +206,33 @@ class SchwabFeed(DataFeed):
             token_json = os.getenv("SCHWAB_TOKEN_JSON")
         if not token_json:
             return False
-        # token_json puede ser dict (st.secrets to-dict) o string
-        if not isinstance(token_json, str):
-            token_json = json.dumps(dict(token_json))
+
+        # Normalizar: aceptar dict (st.secrets nested) o string
+        if isinstance(token_json, dict) or (
+            hasattr(token_json, "items") and not isinstance(token_json, str)
+        ):
+            try:
+                parsed = dict(token_json)
+            except Exception as e:
+                raise RuntimeError(f"SCHWAB_TOKEN_JSON dict mal formado: {e}")
+        else:
+            # String: strip whitespace y parsear JSON. Esto detecta y limpia
+            # newlines/tabs introducidos por TOML triple-quoted strings.
+            s = str(token_json).strip()
+            try:
+                parsed = json.loads(s)
+            except json.JSONDecodeError as e:
+                raise RuntimeError(
+                    f"SCHWAB_TOKEN_JSON no es JSON valido (pos={e.pos}, {e.msg}). "
+                    "Asegurarse de usar TOML literal string ''' (single quotes "
+                    "triple) en vez de \"\"\" para evitar procesamiento de escapes. "
+                    "Re-generar con scripts/generate_schwab_token.py y copiar TODO."
+                )
+
+        # Escribir compacto y limpio
         token_path = Path(self.token_path)
         token_path.parent.mkdir(parents=True, exist_ok=True)
-        token_path.write_text(token_json)
+        token_path.write_text(json.dumps(parsed, separators=(",", ":")))
         return True
 
     @property
