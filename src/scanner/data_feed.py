@@ -181,14 +181,67 @@ class SchwabFeed(DataFeed):
                 out[k] = os.getenv(k)
         return out
 
+    def _maybe_write_token_from_secret(self) -> bool:
+        """
+        Si SCHWAB_TOKEN_JSON esta en secrets/env, escribirlo a token_path.
+        Esto permite usar Schwab en Streamlit Cloud sin necesidad de hacer
+        OAuth flow desde el server (que no funciona porque el callback
+        127.0.0.1 es localhost del server, no del usuario).
+        """
+        import json
+        token_json = None
+        # 1) st.secrets
+        try:
+            import streamlit as st
+            if hasattr(st, "secrets"):
+                try:
+                    token_json = (st.secrets.get("SCHWAB_TOKEN_JSON")
+                                   if hasattr(st.secrets, "get")
+                                   else st.secrets["SCHWAB_TOKEN_JSON"])
+                except Exception:
+                    token_json = None
+        except Exception:
+            pass
+        # 2) env var
+        if not token_json:
+            token_json = os.getenv("SCHWAB_TOKEN_JSON")
+        if not token_json:
+            return False
+        # token_json puede ser dict (st.secrets to-dict) o string
+        if not isinstance(token_json, str):
+            token_json = json.dumps(dict(token_json))
+        token_path = Path(self.token_path)
+        token_path.parent.mkdir(parents=True, exist_ok=True)
+        token_path.write_text(token_json)
+        return True
+
     @property
     def client(self):
         if self._client is None:
-            from schwab.auth import easy_client
-            self._client = easy_client(
-                api_key=self.app_key, app_secret=self.app_secret,
-                callback_url=self.callback_url, token_path=self.token_path,
-            )
+            self._maybe_write_token_from_secret()
+            # Si el token file existe (sea por secret o pre-existente local),
+            # usar client_from_token_file (no hace OAuth interactivo).
+            if Path(self.token_path).exists():
+                from schwab.auth import client_from_token_file
+                self._client = client_from_token_file(
+                    api_key=self.app_key,
+                    app_secret=self.app_secret,
+                    token_path=self.token_path,
+                )
+            else:
+                # Sin token: solo en local interactivo se puede hacer OAuth.
+                # En Streamlit Cloud esto cuelga la app -> error explicito.
+                if os.environ.get("STREAMLIT_RUNTIME_ENV") == "cloud" or \
+                   os.environ.get("HOSTNAME", "").startswith("streamlit-"):
+                    raise RuntimeError(
+                        "Schwab requiere SCHWAB_TOKEN_JSON en Streamlit Cloud. "
+                        "Generar token localmente con easy_client y pegarlo como secret."
+                    )
+                from schwab.auth import easy_client
+                self._client = easy_client(
+                    api_key=self.app_key, app_secret=self.app_secret,
+                    callback_url=self.callback_url, token_path=self.token_path,
+                )
         return self._client
 
     def fetch_history(self, ticker: str, years: int = 2) -> pd.DataFrame:
