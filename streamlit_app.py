@@ -58,12 +58,41 @@ DEFAULT_RFR = 3.7
 # ============================================================================
 
 st.sidebar.title("Configuracion")
+
+
+def _schwab_credentials_present() -> bool:
+    """Verifica si hay credenciales de Schwab disponibles."""
+    try:
+        if hasattr(st, "secrets"):
+            try:
+                key = st.secrets.get("SCHWAB_APP_KEY") if hasattr(st.secrets, "get") else st.secrets.get("SCHWAB_APP_KEY", None)
+            except Exception:
+                key = None
+            if key:
+                return True
+    except Exception:
+        pass
+    import os
+    return bool(os.getenv("SCHWAB_APP_KEY"))
+
+
+schwab_available = _schwab_credentials_present()
+provider_options = ["yfinance"] + (["schwab"] if schwab_available else [])
+provider_help = (
+    "yfinance: gratis, sin auth.  "
+    + ("schwab: detectado en secrets." if schwab_available
+       else "schwab: NO disponible (falta SCHWAB_APP_KEY en secrets/.env).")
+)
 provider = st.sidebar.radio(
     "Data provider",
-    options=["yfinance", "schwab"],
+    options=provider_options,
     index=0,
-    help="yfinance es gratis. Schwab requiere OAuth (.env configurado).",
+    help=provider_help,
 )
+if not schwab_available:
+    st.sidebar.caption(":lock: Schwab desactivado: configurar `SCHWAB_APP_KEY` "
+                        "y `SCHWAB_APP_SECRET` en Streamlit Cloud → Settings → Secrets "
+                        "(o en `.env` local). Mientras tanto se usa yfinance.")
 
 tickers = st.sidebar.multiselect(
     "Tickers a scannear",
@@ -98,9 +127,19 @@ log_to_db = st.sidebar.checkbox("Loggear scan a SQLite", value=False,
 # Cache de feed (evita llamadas duplicadas en re-renders)
 # ============================================================================
 
+def _safe_feed(provider: str):
+    """Devuelve el feed solicitado o cae a yfinance si schwab falla."""
+    try:
+        return get_feed(provider)
+    except Exception as e:
+        # Fallback silencioso a yfinance si schwab no esta configurado.
+        # Esto evita crash duro en Streamlit Cloud.
+        return get_feed("yfinance")
+
+
 @st.cache_data(ttl=300)  # 5 min
 def cached_scan(provider: str, ticker: str) -> dict:
-    feed = get_feed(provider)
+    feed = _safe_feed(provider)
     history = feed.fetch_history(ticker, years=2)
     iv, iv_meta = feed.fetch_atm_iv_30d(ticker)
     return {
@@ -113,7 +152,7 @@ def cached_scan(provider: str, ticker: str) -> dict:
 
 @st.cache_data(ttl=300)
 def cached_vix(provider: str):
-    feed = get_feed(provider)
+    feed = _safe_feed(provider)
     return feed.fetch_vix_close()
 
 
@@ -125,9 +164,14 @@ st.title("Vertical Spreads Scanner")
 st.caption(f"Provider: **{provider}** | Filtro: above_sma200 AND vrp >= {vrp_threshold*100:.1f}pp | "
             f"Trade: delta {delta_short}, DTE {dte}, ${width} ancho")
 
-vix, vix_meta = cached_vix(provider)
+try:
+    vix, vix_meta = cached_vix(provider)
+except Exception as e:
+    vix, vix_meta = None, {"error": str(e)}
+    st.warning(f"VIX no disponible: {e}")
 top_cols = st.columns(4)
-top_cols[0].metric("VIX", f"{vix:.2f}" if vix else "n/a", help=vix_meta.get("date", ""))
+top_cols[0].metric("VIX", f"{vix:.2f}" if vix else "n/a",
+                    help=vix_meta.get("date", "") or vix_meta.get("error", ""))
 top_cols[1].metric("Tickers", ", ".join(tickers) if tickers else "—")
 top_cols[2].metric("Delta short", f"{delta_short}")
 top_cols[3].metric("DTE", f"{dte}")
