@@ -42,6 +42,18 @@ DIVIDEND_YIELDS = {
     "IWM": 0.014,
 }
 
+# Dividend yields POINT-IN-TIME por anio (trailing 12m vigente al inicio de
+# cada anio, valores publicos aproximados). Evita usar el yield de fin de
+# muestra retroactivamente (hallazgo del code review adversarial).
+DIVIDEND_YIELDS_BY_YEAR = {
+    "SPY": {2018: 0.018, 2019: 0.019, 2020: 0.018, 2021: 0.013, 2022: 0.014,
+            2023: 0.015, 2024: 0.013, 2025: 0.012, 2026: 0.013},
+    "QQQ": {2018: 0.008, 2019: 0.008, 2020: 0.007, 2021: 0.005, 2022: 0.006,
+            2023: 0.006, 2024: 0.006, 2025: 0.006, 2026: 0.006},
+    "IWM": {2018: 0.012, 2019: 0.013, 2020: 0.013, 2021: 0.010, 2022: 0.012,
+            2023: 0.014, 2024: 0.013, 2025: 0.013, 2026: 0.014},
+}
+
 # Costos de trading (Schwab approx, por trade completo: 2 legs apertura + 2 legs cierre).
 COMMISSION_PER_CONTRACT = 0.65  # USD por contrato por leg
 COMMISSION_PER_TRADE = COMMISSION_PER_CONTRACT * 4  # = 2.60
