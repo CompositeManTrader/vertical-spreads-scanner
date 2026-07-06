@@ -51,3 +51,8 @@ Thumbs.db
 
 # Streamlit cache
 .streamlit/cache/
+
+# Backtest results and final PDF (local only)
+reports/_backtest_holdexpiry/
+reports/_final_pdf_charts/
+reports/*.pdf
